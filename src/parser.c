@@ -1,77 +1,93 @@
 #define TOKEN_SIZE 10
 #define TOKEN_LIST 10
 #include <stdlib.h>
-
-typedef struct {
-    char** tokens;
-    int count;
-} TokenList;
-
-enum Tokens {COMMAND, ARGUMENT, REDIRECTION, PIPE, SPECIAL};
-typedef enum {START, IN_WORD, IN_QUOTE} TokenizerState;
-
-int tokenizer(const char* input, TokenList* result);
+#include "parser.h"
 
 int tokenizer(const char* input, TokenList* result) {
-    int tokenList = TOKEN_LIST;
+    int tokenListSize = TOKEN_LIST;
     int tokenSize = TOKEN_SIZE;
-    int tokenCount = 0;
     int tokenIndex = 0;
-    const char* cPtr = input;
-    TokenizerState state = START;
-    result->tokens = calloc(tokenList, sizeof(char*));
+    int tokenCount = 0;
+    result->tokens = calloc(tokenListSize, sizeof(Token));
     char* token = calloc(tokenSize, sizeof(char));
+    TokenizerState state = START;
+    TokenType currentType = COMMAND;
+    const char* cPtr = input;
     while (*cPtr != '\0') {
-        if (tokenCount >= tokenList) {
-            tokenList *= 2;
-            result->tokens = realloc(result->tokens, tokenList * sizeof(char*));
+        if (tokenCount >= tokenListSize) {
+            tokenListSize *= 2;
+            result->tokens = realloc(result->tokens, tokenListSize * sizeof(Token));
             if (result->tokens == NULL)
-                return -1;
+                return -1; // Memory allocation failure
         }
         if (tokenIndex >= tokenSize) {
             tokenSize *= 2;
             token = realloc(token, tokenSize * sizeof(char));
             if (token == NULL)
-                return -1;
+                return -1; // Memory allocation failure
         }
-        if (state == START) {
-            if (*cPtr == ' ') {
-                cPtr++;
-                continue;
-            }
-            else 
-                state = IN_WORD;
-        }
-        if (state == IN_WORD) {
-            if (*cPtr == ' ') {
-                result->tokens[tokenCount++] = token;
-                state = START;
-                tokenSize = TOKEN_SIZE;
-                token = calloc(tokenSize, sizeof(char));
-                tokenIndex = 0;
-            }
-            else if (*cPtr == '"') {
-                state = IN_QUOTE;
-            }
-            else
-                token[tokenIndex++] = *cPtr;
-        }
-        if (state == IN_QUOTE) {
-            if (*cPtr == '"') {
-                result->tokens[tokenCount++] = token;
-                state = START;
-                tokenSize = TOKEN_SIZE;
-                token = calloc(tokenSize, sizeof(char));
-                tokenIndex = 0;
-            }
-            else
-                token[tokenIndex++] = *cPtr;
+        switch (state) {
+            case START:
+                if (*cPtr == ' ') {
+                    cPtr++;
+                    continue;
+                }
+                else {
+                    state = IN_WORD;
+                }
+                break;
+            case IN_WORD:
+                if (*cPtr == '|') {
+                    currentType = PIPE;
+                }
+                else if (*cPtr == '>') {
+                    currentType = REDIRECTION;
+                }
+                // More conditions for other token types as needed...
+
+                if (*cPtr == ' ' || *cPtr == '|' || *cPtr == '>') {
+                    result->tokens[tokenCount++] = (Token){strdup(token), currentType};
+                    tokenSize = TOKEN_SIZE;
+                    token = calloc(tokenSize, sizeof(char));
+                    tokenIndex = 0;
+                    state = START;
+                    currentType = *cPtr == ' ' || *cPtr == '>' ? ARGUMENT : COMMAND;
+                }
+                else if (*cPtr == '"') {
+                    currentType = ARGUMENT;
+                    state = IN_QUOTE;
+                }
+                else {
+                    token[tokenIndex++] = *cPtr;
+                }
+                break;
+            case IN_QUOTE:
+                if (*cPtr == '"') {
+                    result->tokens[tokenCount++] = (Token){strdup(token), currentType};
+                    state = START;
+                    tokenSize = TOKEN_SIZE;
+                    token = calloc(tokenSize, sizeof(char));
+                    tokenIndex = 0;
+                }
+                else {
+                    token[tokenIndex++] = *cPtr;
+                }
+                break;
         }
         cPtr++;
     }
-    if (tokenIndex > 0) 
-        result->tokens[tokenCount++] = token;
-    free(token);
+
+    if (tokenIndex > 0) {
+        result->tokens[tokenCount++] = (Token){strdup(token), currentType};
+    }
+    free(token); // Free token buffer
     result->count = tokenCount;
-    return 0; // return status code
+    return 0;
+}
+
+void printTokens(TokenList *tokenList) {
+    int i = 0;
+    while (i < tokenList->count) {
+        printf("%s{%s}", tokenList->tokens->type, tokenList->tokens->value);
+    }
 }
