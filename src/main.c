@@ -1,11 +1,11 @@
-#include "parser.h"
+#include "lexer.h"
 #define MAX_INPUT_SIZE 1024
 int main() {
     char input[MAX_INPUT_SIZE];
     TokenList tokenList;
     printf("***************\n--BOOGS SHELL--\n***************\n");
     while (1) {
-        printf("> ");
+        printf("mindset> ");
         if (fgets(input, sizeof(input), stdin) == NULL) {
             printf("Error occured reading input\n");
             continue;
